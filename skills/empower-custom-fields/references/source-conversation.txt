@@ -1,0 +1,223 @@
+Thu, Aug 6 at 6:39 PM
+How much do you know about the empower CDS custom field?
+
+Quite a lot—especially around Empower CDS custom fields from both the configuration and practical chromatography/workflow side.
+
+I can help with areas such as:
+
+Custom-field types and scope: Sample, Result, Peak, Component, etc.
+Data types: Boolean, Date, Enumerated, Integer, Real, Text.
+Calculated custom fields and formulas.
+Inter-sample calculations and references such as SAME, PREVIOUS, NEXT, labels, injections, channels, and result sets.
+Peak/component calculations using fields such as Area, Height, Amount, Retention Time, concentration, etc.
+Boolean custom fields and pass/fail logic.
+Enumerated fields and translation tables.
+Use of custom fields in processing methods and report methods.
+Custom-field order of operations and when a calculation actually occurs.
+Calculations across standards, samples, injections, and results.
+Troubleshooting fields that return blank, incorrect results, or unexpected values.
+Custom fields in regulated/GxP workflows—including audit trail and configuration considerations.
+Designing calculations for assay, % recovery, impurity calculations, RSD, averages, specifications, and similar QC workflows.
+
+Given that you're working directly with Empower implementations, we can go fairly deep rather than staying at an introductory level.
+
+There is one important caveat: Empower custom-field syntax and behavior can be surprisingly specific, particularly for complex inter-sample calculations. For an exact production formula, I would want to verify it against the relevant Waters documentation/KCS and your Empower version rather than rely purely on memory.
+
+If you give me a calculation such as:
+
+"I have 6 standard injections, need the average area, then calculate assay of Sample 1 using its dilution and potency."
+
+I can translate the requirement into the Custom Field(s), type, formula, dependencies, and calculation sequence needed in Empower.
+
+Cool!
+Could you give me the formula of Amount which is in-built custom field of empower CDS?
+
+Yes. I checked the Waters Empower 3 Data Acquisition and Processing Theory Guide, and there is an important correction to my earlier wording:
+
+Amount is a built-in Empower peak/result field, not a user-defined custom field.
+
+For the common case where the calibration curve X-value is Amount, the core calculation is:
+
+$$ \boxed{ Amount = X_{\text{from calibration curve}} \times \frac{Dilution}{SampleWeight} } $$
+
+where Empower determines \(X\) by applying the unknown peak's response \(Y\) to the calibration curve. This sequence is explicitly described in the Waters Empower 3 Data Acquisition and Processing Theory Guide.
+
+For a linear calibration
+
+If your calibration curve is:
+
+$$ Y = B X + A $$
+
+then:
+
+$$ X = \frac{Y-A}{B} $$
+
+Therefore:
+
+$$ \boxed{ Amount = \frac{Y-A}{B} \times \frac{Dilution}{SampleWeight} } $$
+
+Where:
+
+\(Y\) = sample response — usually Area, but it can be Height or another configured Y-value
+\(A\) = calibration curve intercept
+\(B\) = calibration curve slope
+Dilution = sample Dilution field
+SampleWeight = sample SampleWeight field
+
+Waters confirms that during quantitation Empower divides the calibration-derived X-value by SampleWeight and multiplies it by Dilution. Waters WKB96394
+
+For example:
+
+$$ Y=10500,\quad A=500,\quad B=1000 $$
+
+So:
+
+$$ X=(10500-500)/1000=10 $$
+
+If:
+
+SampleWeight = 0.5
+Dilution = 10
+
+then:
+
+$$ Amount=10/0.5\times10=\boxed{200} $$
+
+There is another very important layer: if X-Value = Concentration instead of Amount, Empower obtains Concentration from the curve and derives Amount using Injection Volume. Waters documents that relationship too.
+
+So the complete built-in Amount logic actually depends on X-Value, Y-Value, calibration fit, SampleWeight, Dilution, and potentially Injection Volume.
+
+If you'd like, I can next map the complete internal calculation of Amount from Area → Calibration → X Value → SampleWeight → Dilution → Injection Volume, including what happens to standards versus unknowns. That is particularly useful for understanding exactly what Empower is doing behind the scenes.
+
+For a single-standard, single-sample assay using peak Area:
+
+$$ \boxed{ Assay(\%)= \frac{SampleArea}{StandardArea} \times \frac{StandardWeight}{SampleWeight} \times \frac{SampleDilution}{StandardDilution} \times StandardPotency(\%) } $$
+Empower custom-field template
+
+Assuming the standard Sample Set label is STD, with one injection:
+
+(Area/STD.1.SAME(Area))*
+(STD.1.SAME(SampleWeight)/SampleWeight)*
+(Dilution/STD.1.SAME(Dilution))*
+Standard_Potency
+
+Configure it as:
+
+Field type: Peak
+Data type: Real
+Field type/calculation: Intersample
+Result units: %
+Display precision: typically 2
+Potency entry
+If potency is entered as 99.8, use the formula above.
+If potency is entered as 0.998, multiply the complete formula by 100.
+Example
+Sample Area = 980,000
+Standard Area = 1,000,000
+Standard Weight = 50 mg
+Sample Weight = 50 mg
+Both dilution factors = 1
+Standard potency = 99.8%
+$$ Assay= \frac{980000}{1000000}\times\frac{50}{50}\times\frac{1}{1}\times99.8 =\boxed{97.80\%} $$
+
+Alternatively, if Empower calibration is already configured correctly, the cleaner validated calculation is:
+
+(Amount/Label_Claim)*100
+
+Waters also documents this built-in Amount-based approach for percentage label claim. Waters Empower Tip #85
+
+The exact copy-ready formula will depend on whether your dilution is stored as one combined Dilution value or as separate flask, pipette, and aliquot fields.
+
+Wed, Aug 19 at 7:17 AM
+I will give you the formula for the Assay_Single_Area IN empower and you learn or ask me if you have any questions.
+
+Amount*Dilution_Factor*Standard_Potency/100*(100-LOD_Std-Water_Std-OVI_Std)/(100-LOD_Spl-Water_Spl-OVI_Spl)*MW1/MW2/Label_Claim*100
+
+Understood. I’ll treat your validated Empower formula for Assay_Single_Area as:
+
+Amount*Dilution_Factor*Standard_Potency/100*
+(100-LOD_Std-Water_Std-OVI_Std)/
+(100-LOD_Spl-Water_Spl-OVI_Spl)*
+MW1/MW2/Label_Claim*100
+
+Its calculation logic is:
+
+$$ Assay(\%)= \frac{ Amount \times DilutionFactor \times StandardPotency \times StandardCorrection \times MWCorrection }{ SampleCorrection \times LabelClaim } $$
+
+Where:
+
+Amount = Empower’s calibrated amount for the sample peak.
+Dilution_Factor = additional sample-preparation dilution correction.
+Standard_Potency/100 = converts the entered potency percentage to a decimal.
+(100-LOD_Std-Water_Std-OVI_Std) = standard’s corrected as-is purity basis.
+(100-LOD_Spl-Water_Spl-OVI_Spl) = sample’s corrected as-is basis.
+MW1/MW2 = molecular-weight conversion, such as salt-to-active or active-to-salt correction.
+Label_Claim = target amount per dosage unit or declared strength.
+Final *100 = converts the label-claim ratio into assay percentage.
+
+A few points I want to confirm so I understand your implementation exactly:
+
+Is Standard_Potency entered as 99.8, rather than 0.998?
+Does Amount already include Empower’s built-in Dilution/SampleWeight correction, while Dilution_Factor represents an additional preparation or unit-conversion factor?
+What do MW1 and MW2 represent in your convention—for example, is MW1 the active-moiety molecular weight and MW2 the salt molecular weight?
+Are LOD, Water, and OVI all entered as percentage values such as 0.50, not decimal fractions such as 0.005?
+When these corrections do not apply, do you enter 0 in those fields? This matters because blank fields could cause the entire calculated result to remain blank in Empower.
+
+One mathematical observation: /100 after potency and the final *100 cancel numerically. Keeping both is still useful because it clearly documents two separate concepts—converting potency to a fraction and converting the final result to a percentage.
+
+Today 5:50 PM
+Is Standard_Potency entered as 99.8, rather than 0.998?
+
+Yes
+
+Does Amount already include Empower’s built-in Dilution/SampleWeight correction, while Dilution_Factor represents an additional preparation or unit-conversion factor?
+
+Amount has that formula but user generally dont enter the dilution amount into actual Dilution field which is in Amount one, They used the Dilution_Factor to be used in the Assay Formula, And Dilution_Factor formula in Empower is 1/SD1SD2/SD3SD4/SD5SD6/SD7TD1/1*TD3/TD2
+Here is the SD1 is for the STD dlution and TD1 is for the Sample dilution.
+
+What do MW1 and MW2 represent in your convention—for example, is MW1 the active-moiety molecular weight and MW2 the salt molecular weight?
+
+Yes thet all are the molecular weights.
+
+Are LOD, Water, and OVI all entered as percentage values such as 0.50, not decimal fractions such as 0.005?
+
+ytes they are as percentage.
+
+When these corrections do not apply, do you enter 0 in those fields? This matters because blank fields could cause the entire calculated result to remain blank in Empower.
+
+IN waters_std, OVI_Std, LOD_Std apply 0 andMW1, MW2, Label_Claim as 1
+
+Understood. I’ll use the following interpretation for your Empower Assay_Single_Area calculation.
+
+Amount*Dilution_Factor*Standard_Potency/100*
+(100-LOD_Std-Water_Std-OVI_Std)/
+(100-LOD_Spl-Water_Spl-OVI_Spl)*
+MW1/MW2/Label_Claim*100
+
+Key conventions:
+
+Standard_Potency is entered as 99.8.
+LOD, Water, and OVI are entered as percentages, e.g. 0.50.
+Users generally do not use Empower’s built-in Dilution field for the full preparation factor.
+The separate Dilution_Factor custom field handles both standard and sample preparation:
+1/SD1*SD2/SD3*SD4/SD5*SD6/SD7*TD1/1*TD3/TD2
+
+Presented with grouping:
+
+(1/SD1)*(SD2/SD3)*(SD4/SD5)*(SD6/SD7)*
+(TD1/1)*(TD3/TD2)
+SD fields represent standard preparation.
+TD fields represent test/sample preparation.
+MW1/MW2 provides the required molecular-weight conversion.
+When standard corrections do not apply:
+Water_Std = 0
+OVI_Std   = 0
+LOD_Std   = 0
+When molecular-weight conversion or label-claim correction does not apply:
+MW1         = 1
+MW2         = 1
+Label_Claim = 1
+
+The /100 after potency and final *100 mathematically cancel, but keeping both makes the calculation logic clear: potency percentage → fraction → final assay percentage.
+
+One remaining detail: when sample corrections do not apply, I assume LOD_Spl, Water_Spl, and OVI_Spl are also entered as 0, rather than left blank.

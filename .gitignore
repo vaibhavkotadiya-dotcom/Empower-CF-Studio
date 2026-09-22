@@ -1,0 +1,15 @@
+﻿node_modules/
+.next/
+.vercel/
+out/
+dist/
+.env
+.env.*
+!.env.example
+*.pem
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+web/knowledge/**
+!web/knowledge/.gitkeep
+.analysis/
