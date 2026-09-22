@@ -1,0 +1,24 @@
+{
+  "syncedAt": "2026-09-22T13:07:05.587Z",
+  "always": [
+    "SKILL.md",
+    "references/bracketing-rsd.md",
+    "references/uv-wavelength-maximum-2489.md",
+    "references/std-level-mean-correlation-r.md",
+    "references/assay-single-area.md",
+    "references/guide-field-design.md",
+    "references/guide-functions-and-operators.md",
+    "references/guide-intersample-calculations.md",
+    "references/guide-worked-examples.md",
+    "references/guide-source-map.md",
+    "references/custom-field-f1-analysis.md",
+    "references/custom-field-f1-field-catalog.md",
+    "references/training-template.md"
+  ],
+  "onDemand": [
+    "references/source-guide-slide-transcript.md",
+    "references/source-custom-field-f1.md",
+    "references/custom-field-f1-inventory.json"
+  ],
+  "memory": "MEMORY-excerpt.md"
+}

@@ -10,6 +10,4 @@ dist/
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
-web/knowledge/**
-!web/knowledge/.gitkeep
 .analysis/

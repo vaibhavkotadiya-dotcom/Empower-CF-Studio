@@ -39,14 +39,17 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Vercel deploy
 
 1. Import this Git repository in Vercel.
-2. Set **Root Directory** to `web`.
-3. Framework preset: Next.js (default).
-4. Add environment variables:
-   - `OPENAI_API_KEY`
-   - optional: `OPENAI_MODEL`, `DAILY_CHAT_LIMIT`, `OPENAI_MAX_OUTPUT_TOKENS`
-5. Deploy.
+2. Set **Root Directory** to `web` (Project Settings → General).
+3. Set **Framework Preset** to **Next.js**.
+4. Leave **Output Directory** empty (do not set `public` or `.next`).
+5. Add environment variable `OPENAI_API_KEY`.
+6. Click **Redeploy** on the latest deployment (settings alone do not refresh an old 404).
 
-The build runs `prebuild` → `sync-knowledge`. The parent folder `skills/empower-custom-fields` must remain in the same repo so the sync script can read it (`../skills/...` from `web/`).
+If you see Vercel’s black “This page doesn't exist / 404 NOT_FOUND” page, the usual causes are:
+- Root Directory is not `web`
+- Framework is not Next.js / Output Directory was overridden
+- The deployment never succeeded (check Deployments → Building logs)
+- You are opening an old URL that is not linked to a Ready production deployment
 
 ## OpenAI $20 / month budget
 

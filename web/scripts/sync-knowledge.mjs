@@ -117,4 +117,10 @@ const manifest = {
 };
 fs.writeFileSync(path.join(outRoot, "manifest.json"), JSON.stringify(manifest, null, 2));
 
+const skillCheck = path.join(outRoot, "SKILL.md");
+if (!fs.existsSync(skillCheck)) {
+  console.error("[sync-knowledge] ERROR: SKILL.md was not copied. Check that skills/empower-custom-fields exists next to web/.");
+  process.exit(1);
+}
+
 console.log(`[sync-knowledge] wrote ${copied} files to ${outRoot}`);
