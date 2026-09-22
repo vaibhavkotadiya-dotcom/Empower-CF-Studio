@@ -86,13 +86,19 @@ export async function POST(req: NextRequest) {
 
   const client = new OpenAI({ apiKey });
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+  const maxOut = maxOutputTokens();
+  // GPT-5.x / o-series reject max_tokens; they require max_completion_tokens.
+  const usesCompletionTokens =
+    /^(gpt-5|o\d|o1|o3|o4)/i.test(model) || model.toLowerCase().includes("gpt-5");
 
   try {
     const stream = await client.chat.completions.create({
       model,
       stream: true,
-      max_tokens: maxOutputTokens(),
-      temperature: 0.2,
+      ...(usesCompletionTokens
+        ? { max_completion_tokens: maxOut }
+        : { max_tokens: maxOut }),
+      ...(usesCompletionTokens ? {} : { temperature: 0.2 }),
       messages: [{ role: "system", content: system }, ...cleaned],
     });
 
