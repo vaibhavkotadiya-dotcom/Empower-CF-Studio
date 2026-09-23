@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MarkdownMessage } from "./MarkdownMessage";
 import styles from "./chat.module.css";
 
 type Role = "user" | "assistant";
@@ -42,17 +43,6 @@ function detectEvidenceBadges(text: string): string[] {
     badges.push("draft");
   }
   return [...new Set(badges)];
-}
-
-function extractFormulas(text: string): string[] {
-  const blocks: string[] = [];
-  const re = /```(?:text|empower|formula)?\n([\s\S]*?)```/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    const body = match[1]?.trim();
-    if (body && body.length < 4000) blocks.push(body);
-  }
-  return blocks;
 }
 
 function titleFromMessages(messages: Message[]): string {
@@ -111,6 +101,7 @@ export function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authReady, setAuthReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLElement>(null);
   const hydrated = useRef(false);
 
   const activeThread = useMemo(
@@ -172,7 +163,12 @@ export function Chat() {
   }, [threads, email]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const thread = threadRef.current;
+    if (thread) {
+      thread.scrollTop = thread.scrollHeight;
+      return;
+    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, lastMessageContent, busy]);
 
   function updateActiveMessages(updater: (prev: Message[]) => Message[]) {
@@ -422,7 +418,7 @@ export function Chat() {
           </div>
         </header>
 
-        <main className={styles.main}>
+        <main className={empty ? styles.mainEmpty : styles.mainChat}>
           {empty ? (
             <section className={styles.hero}>
               <h1 className={styles.heroTitle}>Ask it. Field it.</h1>
@@ -446,7 +442,7 @@ export function Chat() {
             </section>
           ) : (
             <>
-              <section className={styles.threadWrap} aria-live="polite">
+              <section ref={threadRef} className={styles.threadWrap} aria-live="polite">
                 {messages.map((m) => (
                   <article
                     key={m.id}
@@ -464,16 +460,15 @@ export function Chat() {
                     </div>
                     <div>
                       {m.content ? (
-                        <pre className={styles.messagePre}>{m.content}</pre>
+                        m.role === "assistant" ? (
+                          <MarkdownMessage content={m.content} />
+                        ) : (
+                          <pre className={styles.messagePre}>{m.content}</pre>
+                        )
                       ) : (
                         <span className={styles.caret} />
                       )}
                     </div>
-                    {m.role === "assistant" && m.content
-                      ? extractFormulas(m.content).map((formula, idx) => (
-                          <FormulaCopy key={`${m.id}-${idx}`} formula={formula} />
-                        ))
-                      : null}
                   </article>
                 ))}
                 <div ref={bottomRef} />
@@ -488,26 +483,6 @@ export function Chat() {
           )}
         </main>
       </div>
-    </div>
-  );
-}
-
-function FormulaCopy({ formula }: { formula: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className={styles.formulaBar}>
-      <code className={styles.formulaCode}>{formula}</code>
-      <button
-        type="button"
-        className={styles.copyBtn}
-        onClick={async () => {
-          await navigator.clipboard.writeText(formula);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-      >
-        {copied ? "Copied" : "Copy"}
-      </button>
     </div>
   );
 }

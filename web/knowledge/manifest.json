@@ -1,11 +1,13 @@
 {
-  "syncedAt": "2026-09-23T04:24:14.378Z",
+  "syncedAt": "2026-09-23T16:36:57.465Z",
   "always": [
     "SKILL.md",
     "references/bracketing-rsd.md",
     "references/uv-wavelength-maximum-2489.md",
     "references/std-level-mean-correlation-r.md",
     "references/assay-single-area.md",
+    "references/amount-empower.md",
+    "references/percentage-known-impurity.md",
     "references/guide-field-design.md",
     "references/guide-functions-and-operators.md",
     "references/guide-intersample-calculations.md",

@@ -200,6 +200,8 @@ For Peak Labels `M`, `K`, or `U`, `Area_Correction` subtracts the retrieved blan
 
 The label variants use `SAME.1..MAX(...)` to place the injection-1 result across the same sample label. `Single_Max_Unknown_Impurity` returns the maximum unknown-impurity percentage in a result.
 
+**2026-09-23 training:** For how Amount, Dilution_Factor, and Standard_Potency relate, and for comparing this amount-based known-impurity field to an external impurity-standard Area/Area × Conc/Conc equation (labels `S1`/`U1`, Peak Labels `K`/`U`/`M`, Path 1 vs Path 2 drafts), read [percentage-known-impurity.md](percentage-known-impurity.md) and [amount-empower.md](amount-empower.md). Do not treat the Path 1/Path 2 drafts as Empower-tested.
+
 ### AMV variant
 
 `Percentage_Impurity_AMV` and `Percentage_Unknown_Imp_AMV` retrieve standard MW/potency information from label `S1` and use `STD_CON`. `AMV` likely refers to analytical method validation, but the workbook does not define it.

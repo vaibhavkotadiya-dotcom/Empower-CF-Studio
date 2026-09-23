@@ -20,6 +20,11 @@ const ALWAYS_COPY = [
     to: "references/std-level-mean-correlation-r.md",
   },
   { from: path.join(skillRoot, "references", "assay-single-area.md"), to: "references/assay-single-area.md" },
+  { from: path.join(skillRoot, "references", "amount-empower.md"), to: "references/amount-empower.md" },
+  {
+    from: path.join(skillRoot, "references", "percentage-known-impurity.md"),
+    to: "references/percentage-known-impurity.md",
+  },
   { from: path.join(skillRoot, "references", "guide-field-design.md"), to: "references/guide-field-design.md" },
   {
     from: path.join(skillRoot, "references", "guide-functions-and-operators.md"),
