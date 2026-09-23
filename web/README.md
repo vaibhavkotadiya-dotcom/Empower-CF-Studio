@@ -1,6 +1,6 @@
 # Empower CF Studio
 
-Public, no-login chatbot that drafts Empower CDS custom-field formulas from natural language using the packaged training library in this repository.
+Login-gated chatbot that drafts Empower CDS custom-field formulas from natural language using the packaged training library in this repository.
 
 Not affiliated with Waters Corporation.
 
@@ -9,14 +9,14 @@ Not affiliated with Waters Corporation.
 ```bash
 cd web
 cp .env.example .env.local
-# put OPENAI_API_KEY in .env.local
+# fill AUTH_*, AI provider keys, and model settings
 npm install
 npm run dev
 ```
 
 `predev` / `prebuild` run `npm run sync-knowledge`, which copies `../skills/empower-custom-fields` (plus a MEMORY excerpt) into `web/knowledge/`.
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) — you will be redirected to `/login`.
 
 ## Scripts
 
@@ -29,52 +29,52 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Environment variables
 
-| Name | Required | Default | Purpose |
-|------|----------|---------|---------|
-| `OPENAI_API_KEY` | yes | — | Server-only OpenAI key |
-| `OPENAI_MODEL` | no | `gpt-4.1-mini` | Chat model |
-| `DAILY_CHAT_LIMIT` | no | `30` | Max `/api/chat` calls per IP per UTC day |
-| `OPENAI_MAX_OUTPUT_TOKENS` | no | `2000` | Caps reply length / cost |
+### Auth (required)
+
+| Name | Example | Purpose |
+|------|---------|---------|
+| `AUTH_USERS` | `Field@waters.com:Empower@123\|Test@waters.com:Empower@123` | Pipe-separated `email:password` pairs |
+| `AUTH_SECRET` | long random string (16+ chars) | Signs the httpOnly session cookie |
+
+### AI provider
+
+| Name | Example | Purpose |
+|------|---------|---------|
+| `AI_PROVIDER` | `openrouter` or `openai` | Which API to call (default `openrouter`) |
+| `OPENROUTER_API_KEY` | `sk-or-...` | Required when provider is OpenRouter |
+| `OPENROUTER_MODEL` | `openai/gpt-5.5` | Any OpenRouter model slug |
+| `OPENROUTER_SITE_URL` | `https://your-app.vercel.app` | Optional OpenRouter referer header |
+| `OPENROUTER_APP_NAME` | `Empower CF Studio` | Optional OpenRouter app title |
+| `OPENAI_API_KEY` | `sk-...` | Required when provider is OpenAI |
+| `OPENAI_MODEL` | `gpt-5.5` | OpenAI model id |
+
+### Cost / generation controls
+
+| Name | Default | Purpose |
+|------|---------|---------|
+| `MODEL_TEMPERATURE` | `0.2` | Sent when the model supports temperature |
+| `OPENAI_MAX_OUTPUT_TOKENS` | `2000` | Caps completion length (main cost lever) |
+| `DAILY_CHAT_LIMIT` | `30` | Max `/api/chat` calls per IP per UTC day |
+
+If you currently only have an OpenAI key, set `AI_PROVIDER=openai`. If you use OpenRouter, set `AI_PROVIDER=openrouter` plus `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
 
 ## Vercel deploy
 
-1. Import this Git repository in Vercel.
-2. Set **Root Directory** to `web` (Project Settings → General).
-3. Set **Framework Preset** to **Next.js**.
-4. Leave **Output Directory** empty (do not set `public` or `.next`).
-5. Add environment variable `OPENAI_API_KEY`.
-6. Click **Redeploy** on the latest deployment (settings alone do not refresh an old 404).
+1. Root Directory: `web`
+2. Framework Preset: **Next.js**
+3. Output Directory: leave empty
+4. Add the env vars above (auth + provider + cost controls)
+5. Redeploy after changing env vars
 
-If you see Vercel’s black “This page doesn't exist / 404 NOT_FOUND” page, the usual causes are:
-- Root Directory is not `web`
-- Framework is not Next.js / Output Directory was overridden
-- The deployment never succeeded (check Deployments → Building logs)
-- You are opening an old URL that is not linked to a Ready production deployment
+## Auth and chat history
 
-## OpenAI $20 / month budget
-
-In the [OpenAI platform](https://platform.openai.com/):
-
-1. Open the project that owns the API key.
-2. Set a **monthly budget of $20** and enable email alerts.
-3. Prefer keeping `OPENAI_MODEL=gpt-4.1-mini` for the public demo.
-
-## Abuse controls (v1)
-
-- ~30 chat requests / IP / UTC day (in-memory on the serverless instance; not a perfect global counter across all isolates).
-- Conversation history truncated to the last 8 turns sent to the model.
-- Max output tokens capped via env.
-
-If abuse appears, upgrade to a shared store (for example Upstash Redis) for global IP limits.
+- Unauthenticated users are redirected to `/login`.
+- `/api/chat` requires a valid session cookie.
+- Chat history is stored in the browser (`localStorage`) per logged-in email, with a sidebar for past threads and **New chat**.
+- History does not sync across devices (no database in this version).
 
 ## Knowledge behavior
 
 - Always injects `SKILL.md` + `MEMORY-excerpt.md`.
-- Topic router pulls matching lesson/guide files (bracketing RSD, 2489 UV, correlation r, assay, intersample, workbook families, etc.).
-- Large transcripts are packaged but not injected unless retrieval selects them within the context budget.
+- Topic router pulls matching lesson/guide files.
 - Public chats do **not** write back into `MEMORY.md` or the skill.
-
-## Model plan
-
-- Default: `gpt-4.1-mini` (cost-fit for public + $20/mo).
-- Override with `OPENAI_MODEL` (for example `gpt-4.1`) when you need stronger formula drafting and can afford it.

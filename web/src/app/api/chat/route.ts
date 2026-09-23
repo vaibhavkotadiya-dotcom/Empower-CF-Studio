@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextRequest } from "next/server";
+import { getSessionFromRequest } from "@/lib/auth";
 import { buildKnowledgeContext } from "@/lib/knowledge";
 import { buildSystemPrompt } from "@/lib/prompt";
 import { checkDailyLimit, consumeDailyLimit, getClientIp } from "@/lib/rate-limit";
@@ -21,13 +22,76 @@ function maxOutputTokens(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 2000;
 }
 
-export async function POST(req: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY;
+function modelTemperature(): number {
+  const n = Number(process.env.MODEL_TEMPERATURE ?? "0.2");
+  if (!Number.isFinite(n)) return 0.2;
+  return Math.min(2, Math.max(0, n));
+}
+
+function aiProvider(): "openrouter" | "openai" {
+  const raw = (process.env.AI_PROVIDER ?? "openrouter").trim().toLowerCase();
+  return raw === "openai" ? "openai" : "openrouter";
+}
+
+function resolveModel(provider: "openrouter" | "openai"): string {
+  if (provider === "openrouter") {
+    return process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4.1-mini";
+  }
+  return process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+}
+
+function usesCompletionTokens(model: string): boolean {
+  const m = model.toLowerCase();
+  return (
+    m.includes("gpt-5") ||
+    /(^|\/)(o1|o3|o4)([-_/]|$)/.test(m) ||
+    /(^|\/)o\d/.test(m)
+  );
+}
+
+function supportsTemperature(model: string): boolean {
+  // Reasoning-heavy families often reject or ignore temperature.
+  return !usesCompletionTokens(model);
+}
+
+function createClient(provider: "openrouter" | "openai"): OpenAI {
+  if (provider === "openrouter") {
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error("Server is missing OPENROUTER_API_KEY.");
+    }
+    return new OpenAI({
+      apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": process.env.OPENROUTER_SITE_URL?.trim() || "",
+        "X-Title": process.env.OPENROUTER_APP_NAME?.trim() || "Empower CF Studio",
+      },
+    });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    return Response.json(
-      { error: "Server is missing OPENAI_API_KEY." },
-      { status: 500 },
-    );
+    throw new Error("Server is missing OPENAI_API_KEY.");
+  }
+  return new OpenAI({ apiKey });
+}
+
+export async function POST(req: NextRequest) {
+  const session = await getSessionFromRequest(req);
+  if (!session) {
+    return Response.json({ error: "Unauthorized. Please log in." }, { status: 401 });
+  }
+
+  const provider = aiProvider();
+  let client: OpenAI;
+  let model: string;
+  try {
+    client = createClient(provider);
+    model = resolveModel(provider);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "AI provider is not configured.";
+    return Response.json({ error: message }, { status: 500 });
   }
 
   const ip = getClientIp(req.headers);
@@ -84,28 +148,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
   const maxOut = maxOutputTokens();
-  // GPT-5.x / o-series reject max_tokens; they require max_completion_tokens.
-  const usesCompletionTokens =
-    /^(gpt-5|o\d|o1|o3|o4)/i.test(model) || model.toLowerCase().includes("gpt-5");
+  const completionTokens = usesCompletionTokens(model);
+  const temperature = modelTemperature();
 
   try {
     const stream = await client.chat.completions.create({
       model,
       stream: true,
-      ...(usesCompletionTokens
-        ? { max_completion_tokens: maxOut }
-        : { max_tokens: maxOut }),
-      ...(usesCompletionTokens ? {} : { temperature: 0.2 }),
+      ...(completionTokens ? { max_completion_tokens: maxOut } : { max_tokens: maxOut }),
+      ...(supportsTemperature(model) ? { temperature } : {}),
       messages: [{ role: "system", content: system }, ...cleaned],
     });
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
-        const meta = JSON.stringify({ selectedIds, remaining: consumed.remaining, limit: consumed.limit });
+        const meta = JSON.stringify({
+          selectedIds,
+          remaining: consumed.remaining,
+          limit: consumed.limit,
+          provider,
+          model,
+        });
         controller.enqueue(encoder.encode(`event: meta\ndata: ${meta}\n\n`));
         try {
           for await (const chunk of stream) {
@@ -137,7 +202,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to call OpenAI";
+    const message = err instanceof Error ? err.message : "Failed to call the model provider";
     return Response.json({ error: message }, { status: 502 });
   }
 }

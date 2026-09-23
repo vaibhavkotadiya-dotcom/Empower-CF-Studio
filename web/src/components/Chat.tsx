@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./chat.module.css";
 
 type Role = "user" | "assistant";
@@ -11,13 +12,22 @@ type Message = {
   content: string;
 };
 
+type Thread = {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: Message[];
+};
+
 const EXAMPLE = {
   label: "Bracketing %RSD",
   prompt:
     "I need one Peak custom field for five-point bracketing-standard %RSD using S1 initial standards and BRK% brackets on Area.",
 };
 
-const STORAGE_KEY = "empower-cf-studio-messages";
+function threadsKey(email: string): string {
+  return `empower-cf-studio:${email.toLowerCase()}:threads`;
+}
 
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -45,6 +55,37 @@ function extractFormulas(text: string): string[] {
   return blocks;
 }
 
+function titleFromMessages(messages: Message[]): string {
+  const firstUser = messages.find((m) => m.role === "user" && m.content.trim());
+  if (!firstUser) return "New chat";
+  const t = firstUser.content.trim().replace(/\s+/g, " ");
+  return t.length > 42 ? `${t.slice(0, 42)}…` : t;
+}
+
+function loadThreads(email: string): Thread[] {
+  try {
+    const raw = localStorage.getItem(threadsKey(email));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Thread[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((t) => t && typeof t.id === "string" && Array.isArray(t.messages))
+      .map((t) => ({
+        id: t.id,
+        title: t.title || "New chat",
+        updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : Date.now(),
+        messages: t.messages.slice(-80),
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+function saveThreads(email: string, threads: Thread[]) {
+  localStorage.setItem(threadsKey(email), JSON.stringify(threads.slice(0, 40)));
+}
+
 function SendIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -60,50 +101,137 @@ function SendIcon() {
 }
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hydrated = useRef(false);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Message[];
-        if (Array.isArray(parsed)) setMessages(parsed.slice(-40));
-      }
-    } catch {
-      /* ignore */
-    }
-    hydrated.current = true;
-  }, []);
+  const activeThread = useMemo(
+    () => threads.find((t) => t.id === activeId) ?? null,
+    [threads, activeId],
+  );
+  const messages = activeThread?.messages ?? [];
+  const empty = messages.length === 0;
+  const lastMessageContent = messages[messages.length - 1]?.content ?? "";
 
   useEffect(() => {
-    if (!hydrated.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) {
+          router.replace("/login");
+          return;
+        }
+        const data = (await res.json()) as { email?: string };
+        if (!data.email) {
+          router.replace("/login");
+          return;
+        }
+        if (cancelled) return;
+        setEmail(data.email);
+        const loaded = loadThreads(data.email);
+        if (loaded.length === 0) {
+          const fresh: Thread = {
+            id: uid(),
+            title: "New chat",
+            updatedAt: Date.now(),
+            messages: [],
+          };
+          setThreads([fresh]);
+          setActiveId(fresh.id);
+        } else {
+          setThreads(loaded);
+          setActiveId(loaded[0]!.id);
+        }
+        setAuthReady(true);
+        hydrated.current = true;
+      } catch {
+        router.replace("/login");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (!hydrated.current || !email) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40)));
+      saveThreads(email, threads);
     } catch {
       /* ignore */
     }
-  }, [messages]);
+  }, [threads, email]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
 
-  const empty = messages.length === 0;
+  function updateActiveMessages(updater: (prev: Message[]) => Message[]) {
+    if (!activeId) return;
+    setThreads((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeId) return t;
+        const nextMessages = updater(t.messages);
+        return {
+          ...t,
+          messages: nextMessages,
+          title: titleFromMessages(nextMessages),
+          updatedAt: Date.now(),
+        };
+      }),
+    );
+  }
+
+  function startNewChat() {
+    const fresh: Thread = {
+      id: uid(),
+      title: "New chat",
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setThreads((prev) => [fresh, ...prev]);
+    setActiveId(fresh.id);
+    setError(null);
+    setInput("");
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   async function sendPrompt(prompt: string) {
     const trimmed = prompt.trim();
-    if (!trimmed || busy) return;
+    if (!trimmed || busy || !activeId) return;
 
     setError(null);
     const userMsg: Message = { id: uid(), role: "user", content: trimmed };
     const assistantId = uid();
-    const nextMessages = [...messages, userMsg];
-    setMessages([...nextMessages, { id: assistantId, role: "assistant", content: "" }]);
+    const current = threads.find((t) => t.id === activeId);
+    const nextMessages = [...(current?.messages ?? []), userMsg];
+
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === activeId
+          ? {
+              ...t,
+              messages: [...nextMessages, { id: assistantId, role: "assistant", content: "" }],
+              title: titleFromMessages(nextMessages),
+              updatedAt: Date.now(),
+            }
+          : t,
+      ),
+    );
     setInput("");
     setBusy(true);
 
@@ -116,15 +244,20 @@ export function Chat() {
         }),
       });
 
+      if (res.status === 401) {
+        router.replace("/login");
+        throw new Error("Session expired. Please log in again.");
+      }
+
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        updateActiveMessages((prev) => prev.filter((m) => m.id !== assistantId));
         throw new Error(data?.error || `Request failed (${res.status})`);
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        updateActiveMessages((prev) => prev.filter((m) => m.id !== assistantId));
         throw new Error("No response stream.");
       }
 
@@ -149,14 +282,11 @@ export function Chat() {
           }
           if (!dataLine) continue;
           try {
-            const data = JSON.parse(dataLine) as {
-              text?: string;
-              error?: string;
-            };
+            const data = JSON.parse(dataLine) as { text?: string; error?: string };
             if (event === "token" && data.text) {
               assistantText += data.text;
               const snapshot = assistantText;
-              setMessages((prev) =>
+              updateActiveMessages((prev) =>
                 prev.map((m) => (m.id === assistantId ? { ...m, content: snapshot } : m)),
               );
             }
@@ -171,13 +301,13 @@ export function Chat() {
       }
 
       if (!assistantText.trim()) {
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        updateActiveMessages((prev) => prev.filter((m) => m.id !== assistantId));
         throw new Error("The model returned an empty response.");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Chat failed.";
       setError(message);
-      setMessages((prev) =>
+      updateActiveMessages((prev) =>
         prev.filter((m) => !(m.id === assistantId && m.content.trim().length === 0)),
       );
     } finally {
@@ -188,12 +318,6 @@ export function Chat() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void sendPrompt(input);
-  }
-
-  function clearChat() {
-    setMessages([]);
-    setError(null);
-    localStorage.removeItem(STORAGE_KEY);
   }
 
   const promptCard = (
@@ -208,7 +332,7 @@ export function Chat() {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Describe the custom field you want to create..."
-        disabled={busy}
+        disabled={busy || !authReady}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -221,12 +345,12 @@ export function Chat() {
           <span className={styles.toolDot} aria-hidden>
             ⌘
           </span>
-          <span>gpt-4.1-mini · library grounded</span>
+          <span>library grounded</span>
         </div>
         <button
           className={styles.sendRound}
           type="submit"
-          disabled={busy || !input.trim()}
+          disabled={busy || !input.trim() || !authReady}
           aria-label="Send"
         >
           <SendIcon />
@@ -235,88 +359,135 @@ export function Chat() {
     </form>
   );
 
+  if (!authReady) {
+    return (
+      <div className={styles.shell}>
+        <div className={styles.loading}>Loading…</div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.shell}>
-      <header className={styles.nav}>
-        <button type="button" className={styles.logo} onClick={clearChat}>
-          Empower CF Studio
-        </button>
-        <div className={styles.navRight}>
-          {messages.length > 0 ? (
-            <button type="button" className={styles.clearBtn} onClick={clearChat}>
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarClosed}`}>
+        <div className={styles.sidebarTop}>
+          <button type="button" className={styles.newChatBtn} onClick={startNewChat}>
+            New chat
+          </button>
+        </div>
+        <div className={styles.threadList}>
+          {threads.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`${styles.threadItem} ${t.id === activeId ? styles.threadItemActive : ""}`}
+              onClick={() => {
+                setActiveId(t.id);
+                setError(null);
+              }}
+            >
+              {t.title || "New chat"}
+            </button>
+          ))}
+        </div>
+        <div className={styles.sidebarBottom}>
+          <span className={styles.userEmail} title={email ?? ""}>
+            {email}
+          </span>
+          <button type="button" className={styles.logoutBtn} onClick={() => void logout()}>
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <div className={styles.mainColumn}>
+        <header className={styles.nav}>
+          <div className={styles.navLeft}>
+            <button
+              type="button"
+              className={styles.menuBtn}
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label="Toggle history"
+            >
+              ☰
+            </button>
+            <button type="button" className={styles.logo} onClick={startNewChat}>
+              Empower CF Studio
+            </button>
+          </div>
+          <div className={styles.navRight}>
+            <button type="button" className={styles.clearBtn} onClick={startNewChat}>
               New chat
             </button>
-          ) : null}
-        </div>
-      </header>
+          </div>
+        </header>
 
-      <main className={styles.main}>
-        {empty ? (
-          <section className={styles.hero}>
-            <h1 className={styles.heroTitle}>Ask it. Field it.</h1>
-            <p className={styles.heroSubtitle}>
-              Natural-Language to Empower Custom field Formulas
-            </p>
-            {promptCard}
-            <div className={styles.chips}>
-              <button
-                type="button"
-                className={styles.chip}
-                onClick={() => void sendPrompt(EXAMPLE.prompt)}
-                disabled={busy}
-              >
-                {EXAMPLE.label}
-              </button>
-            </div>
-            {error ? (
-              <p className={styles.error} style={{ marginTop: "1rem", width: "min(100%, 44rem)" }}>
-                {error}
-              </p>
-            ) : null}
-          </section>
-        ) : (
-          <>
-            <section className={styles.threadWrap} aria-live="polite">
-              {messages.map((m) => (
-                <article
-                  key={m.id}
-                  className={m.role === "user" ? styles.userBubble : styles.assistantBubble}
+        <main className={styles.main}>
+          {empty ? (
+            <section className={styles.hero}>
+              <h1 className={styles.heroTitle}>Ask it. Field it.</h1>
+              <p className={styles.heroSubtitle}>Natural-Language to Empower Custom field Formulas</p>
+              {promptCard}
+              <div className={styles.chips}>
+                <button
+                  type="button"
+                  className={styles.chip}
+                  onClick={() => void sendPrompt(EXAMPLE.prompt)}
+                  disabled={busy}
                 >
-                  <div className={styles.bubbleMeta}>
-                    <span>{m.role === "user" ? "You" : "Studio"}</span>
-                    {m.role === "assistant"
-                      ? detectEvidenceBadges(m.content).map((b) => (
-                          <span key={b} className={styles.badge}>
-                            {b}
-                          </span>
+                  {EXAMPLE.label}
+                </button>
+              </div>
+              {error ? (
+                <p className={styles.error} style={{ marginTop: "1rem", width: "min(100%, 44rem)" }}>
+                  {error}
+                </p>
+              ) : null}
+            </section>
+          ) : (
+            <>
+              <section className={styles.threadWrap} aria-live="polite">
+                {messages.map((m) => (
+                  <article
+                    key={m.id}
+                    className={m.role === "user" ? styles.userBubble : styles.assistantBubble}
+                  >
+                    <div className={styles.bubbleMeta}>
+                      <span>{m.role === "user" ? "You" : "Studio"}</span>
+                      {m.role === "assistant"
+                        ? detectEvidenceBadges(m.content).map((b) => (
+                            <span key={b} className={styles.badge}>
+                              {b}
+                            </span>
+                          ))
+                        : null}
+                    </div>
+                    <div>
+                      {m.content ? (
+                        <pre className={styles.messagePre}>{m.content}</pre>
+                      ) : (
+                        <span className={styles.caret} />
+                      )}
+                    </div>
+                    {m.role === "assistant" && m.content
+                      ? extractFormulas(m.content).map((formula, idx) => (
+                          <FormulaCopy key={`${m.id}-${idx}`} formula={formula} />
                         ))
                       : null}
-                  </div>
-                  <div>
-                    {m.content ? (
-                      <pre className={styles.messagePre}>{m.content}</pre>
-                    ) : (
-                      <span className={styles.caret} />
-                    )}
-                  </div>
-                  {m.role === "assistant" && m.content
-                    ? extractFormulas(m.content).map((formula, idx) => (
-                        <FormulaCopy key={`${m.id}-${idx}`} formula={formula} />
-                      ))
-                    : null}
-                </article>
-              ))}
-              <div ref={bottomRef} />
-            </section>
-            <div className={styles.composerDock}>
-              <div className={styles.composerInner}>
-                {error ? <p className={styles.error}>{error}</p> : null}
-                {promptCard}
+                  </article>
+                ))}
+                <div ref={bottomRef} />
+              </section>
+              <div className={styles.composerDock}>
+                <div className={styles.composerInner}>
+                  {error ? <p className={styles.error}>{error}</p> : null}
+                  {promptCard}
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </main>
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
