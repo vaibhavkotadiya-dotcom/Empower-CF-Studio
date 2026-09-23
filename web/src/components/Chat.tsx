@@ -173,7 +173,7 @@ export function Chat() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, busy]);
+  }, [messages.length, lastMessageContent, busy]);
 
   function updateActiveMessages(updater: (prev: Message[]) => Message[]) {
     if (!activeId) return;
