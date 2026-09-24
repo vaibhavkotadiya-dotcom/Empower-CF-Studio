@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { WatersMark } from "@/components/HelpTopics";
 import styles from "./login.module.css";
 
 export default function LoginForm() {
@@ -37,6 +38,9 @@ export default function LoginForm() {
   return (
     <div className={styles.shell}>
       <main className={styles.card}>
+        <div className={styles.brandRow}>
+          <WatersMark className={styles.watersLogo} size="lg" />
+        </div>
         <p className={styles.kicker}>Empower CF Studio</p>
         <h1 className={styles.title}>Sign in</h1>
         <p className={styles.sub}>Use your assigned email and password to continue.</p>

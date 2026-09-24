@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { HelpTopics, WatersMark } from "./HelpTopics";
 import { MarkdownMessage } from "./MarkdownMessage";
 import styles from "./chat.module.css";
 
@@ -18,12 +19,6 @@ type Thread = {
   title: string;
   updatedAt: number;
   messages: Message[];
-};
-
-const EXAMPLE = {
-  label: "Bracketing %RSD",
-  prompt:
-    "I need one Peak custom field for five-point bracketing-standard %RSD using S1 initial standards and BRK% brackets on Area.",
 };
 
 function threadsKey(email: string): string {
@@ -387,6 +382,9 @@ export function Chat() {
           ))}
         </div>
         <div className={styles.sidebarBottom}>
+          <div className={styles.sidebarBrand}>
+            <WatersMark className={styles.watersLogoSm} size="sm" />
+          </div>
           <span className={styles.userEmail} title={email ?? ""}>
             {email}
           </span>
@@ -407,8 +405,10 @@ export function Chat() {
             >
               ☰
             </button>
-            <button type="button" className={styles.logo} onClick={startNewChat}>
-              Empower CF Studio
+            <button type="button" className={styles.brandLockup} onClick={startNewChat}>
+              <WatersMark className={styles.watersLogo} size="md" />
+              <span className={styles.logoDivider} aria-hidden />
+              <span className={styles.logo}>Empower CF Studio</span>
             </button>
           </div>
           <div className={styles.navRight}>
@@ -424,16 +424,7 @@ export function Chat() {
               <h1 className={styles.heroTitle}>Ask it. Field it.</h1>
               <p className={styles.heroSubtitle}>Natural-Language to Empower Custom field Formulas</p>
               {promptCard}
-              <div className={styles.chips}>
-                <button
-                  type="button"
-                  className={styles.chip}
-                  onClick={() => void sendPrompt(EXAMPLE.prompt)}
-                  disabled={busy}
-                >
-                  {EXAMPLE.label}
-                </button>
-              </div>
+              <HelpTopics />
               {error ? (
                 <p className={styles.error} style={{ marginTop: "1rem", width: "min(100%, 44rem)" }}>
                   {error}
