@@ -37,7 +37,18 @@ export default function LoginForm() {
   return (
     <div className={styles.shell}>
       <main className={styles.card}>
-        <p className={styles.kicker}>Empower CF Studio</p>
+        <div className={styles.brandRow}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className={styles.watersMark}
+            src="/waters-mark.svg"
+            alt="Waters"
+            width={36}
+            height={36}
+            decoding="async"
+          />
+          <p className={styles.kicker}>Empower CF Studio</p>
+        </div>
         <h1 className={styles.title}>Sign in</h1>
         <p className={styles.sub}>Use your assigned email and password to continue.</p>
         <form className={styles.form} onSubmit={onSubmit}>

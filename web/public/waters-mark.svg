@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Waters">
+  <title>Waters</title>
+  <rect width="64" height="64" rx="10" fill="#2B333A"/>
+  <path fill="#FFFFFF" d="M10 14 L22 50 L32 26 L42 50 L54 14 L46.5 14 L38.2 38.5 L32 22 L25.8 38.5 L17.5 14 Z"/>
+</svg>
