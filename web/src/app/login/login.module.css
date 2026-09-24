@@ -20,14 +20,14 @@
 .brandRow {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  margin-bottom: 1rem;
 }
 
-.watersMark {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.55rem;
-  flex-shrink: 0;
+.watersLogo {
+  display: block;
+  height: 2.75rem;
+  width: auto;
+  max-width: 100%;
 }
 
 .kicker {

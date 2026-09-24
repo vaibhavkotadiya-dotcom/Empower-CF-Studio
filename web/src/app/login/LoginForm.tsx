@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { WatersMark } from "@/components/HelpTopics";
 import styles from "./login.module.css";
 
 export default function LoginForm() {
@@ -38,17 +39,9 @@ export default function LoginForm() {
     <div className={styles.shell}>
       <main className={styles.card}>
         <div className={styles.brandRow}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className={styles.watersMark}
-            src="/waters-mark.svg"
-            alt="Waters"
-            width={36}
-            height={36}
-            decoding="async"
-          />
-          <p className={styles.kicker}>Empower CF Studio</p>
+          <WatersMark className={styles.watersLogo} size="lg" />
         </div>
+        <p className={styles.kicker}>Empower CF Studio</p>
         <h1 className={styles.title}>Sign in</h1>
         <p className={styles.sub}>Use your assigned email and password to continue.</p>
         <form className={styles.form} onSubmit={onSubmit}>

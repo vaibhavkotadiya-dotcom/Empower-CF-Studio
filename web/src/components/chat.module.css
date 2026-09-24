@@ -185,39 +185,44 @@
 .brandLockup {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   border: none;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   padding: 0;
+  min-width: 0;
 }
 
 .brandLockup .logo {
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.watersMark,
-.watersMarkSm {
-  display: block;
-  border-radius: 0.45rem;
+.logoDivider {
+  width: 1px;
+  height: 1.35rem;
+  background: rgba(255, 255, 255, 0.22);
   flex-shrink: 0;
 }
 
-.watersMark {
-  width: 1.75rem;
-  height: 1.75rem;
+.watersLogo,
+.watersLogoSm {
+  display: block;
+  width: auto;
+  height: 1.85rem;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
-.watersMarkSm {
-  width: 1.35rem;
-  height: 1.35rem;
+.watersLogoSm {
+  height: 1.45rem;
+  max-width: 100%;
 }
 
 .sidebarBrand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -905,6 +910,15 @@
 
   .nav {
     padding: 1rem;
+  }
+
+  .logoDivider,
+  .brandLockup .logo {
+    display: none;
+  }
+
+  .watersLogo {
+    height: 1.55rem;
   }
 
   .status {

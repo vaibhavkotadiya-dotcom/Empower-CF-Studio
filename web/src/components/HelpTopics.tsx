@@ -124,15 +124,22 @@ export function HelpTopics() {
   );
 }
 
-export function WatersMark({ className }: { className?: string }) {
+export function WatersMark({
+  className,
+  size = "md",
+}: {
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const dims = size === "lg" ? { width: 220, height: 56 } : size === "sm" ? { width: 110, height: 28 } : { width: 140, height: 36 };
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       className={className}
-      src="/waters-mark.svg"
-      alt="Waters"
-      width={28}
-      height={28}
+      src="/waters-logo.png"
+      alt="Waters — The Science of What's Possible"
+      width={dims.width}
+      height={dims.height}
       decoding="async"
     />
   );

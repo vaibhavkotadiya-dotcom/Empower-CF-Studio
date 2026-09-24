@@ -383,11 +383,11 @@ export function Chat() {
         </div>
         <div className={styles.sidebarBottom}>
           <div className={styles.sidebarBrand}>
-            <WatersMark className={styles.watersMarkSm} />
-            <span className={styles.userEmail} title={email ?? ""}>
-              {email}
-            </span>
+            <WatersMark className={styles.watersLogoSm} size="sm" />
           </div>
+          <span className={styles.userEmail} title={email ?? ""}>
+            {email}
+          </span>
           <button type="button" className={styles.logoutBtn} onClick={() => void logout()}>
             Logout
           </button>
@@ -406,7 +406,8 @@ export function Chat() {
               ☰
             </button>
             <button type="button" className={styles.brandLockup} onClick={startNewChat}>
-              <WatersMark className={styles.watersMark} />
+              <WatersMark className={styles.watersLogo} size="md" />
+              <span className={styles.logoDivider} aria-hidden />
               <span className={styles.logo}>Empower CF Studio</span>
             </button>
           </div>
