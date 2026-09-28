@@ -29,8 +29,18 @@ function modelTemperature(): number {
 }
 
 function aiProvider(): "openrouter" | "openai" {
-  const raw = (process.env.AI_PROVIDER ?? "openrouter").trim().toLowerCase();
-  return raw === "openai" ? "openai" : "openrouter";
+  const raw = (process.env.AI_PROVIDER ?? "").trim().toLowerCase();
+  if (raw === "openai" || raw === "openrouter") return raw;
+
+  // Auto-pick from whichever key is actually configured.
+  // This avoids the common case where OPENAI_API_KEY is set but the old
+  // default ("openrouter") ignored it and billed a different provider.
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+  if (hasOpenAI && !hasOpenRouter) return "openai";
+  if (hasOpenRouter && !hasOpenAI) return "openrouter";
+  if (hasOpenAI) return "openai";
+  return "openrouter";
 }
 
 function resolveModel(provider: "openrouter" | "openai"): string {

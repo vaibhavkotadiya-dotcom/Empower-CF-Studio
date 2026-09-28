@@ -95,6 +95,7 @@ export function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authReady, setAuthReady] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<{ provider: string; model: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLElement>(null);
   const hydrated = useRef(false);
@@ -273,7 +274,15 @@ export function Chat() {
           }
           if (!dataLine) continue;
           try {
-            const data = JSON.parse(dataLine) as { text?: string; error?: string };
+            const data = JSON.parse(dataLine) as {
+              text?: string;
+              error?: string;
+              provider?: string;
+              model?: string;
+            };
+            if (event === "meta" && data.provider && data.model) {
+              setRouteInfo({ provider: data.provider, model: data.model });
+            }
             if (event === "token" && data.text) {
               assistantText += data.text;
               const snapshot = assistantText;
@@ -336,7 +345,11 @@ export function Chat() {
           <span className={styles.toolDot} aria-hidden>
             ⌘
           </span>
-          <span>library grounded</span>
+          <span>
+            {routeInfo
+              ? `${routeInfo.provider} · ${routeInfo.model}`
+              : "library grounded"}
+          </span>
         </div>
         <button
           className={styles.sendRound}
