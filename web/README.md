@@ -40,13 +40,13 @@ Open [http://localhost:3000](http://localhost:3000) — you will be redirected t
 
 | Name | Example | Purpose |
 |------|---------|---------|
-| `AI_PROVIDER` | `openrouter` or `openai` | Which API to call (default `openrouter`) |
-| `OPENROUTER_API_KEY` | `sk-or-...` | Required when provider is OpenRouter |
-| `OPENROUTER_MODEL` | `openai/gpt-5.5` | Any OpenRouter model slug |
+| `AI_PROVIDER` | `openai` or `openrouter` | Which API to call. If unset, auto-picks from the configured key (prefers OpenAI) |
+| `OPENAI_API_KEY` | `sk-...` | Used when provider is OpenAI |
+| `OPENAI_MODEL` | `gpt-4.1-mini` | OpenAI model id |
+| `OPENROUTER_API_KEY` | `sk-or-...` | Used when provider is OpenRouter |
+| `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | Any OpenRouter model slug |
 | `OPENROUTER_SITE_URL` | `https://your-app.vercel.app` | Optional OpenRouter referer header |
 | `OPENROUTER_APP_NAME` | `Empower CF Studio` | Optional OpenRouter app title |
-| `OPENAI_API_KEY` | `sk-...` | Required when provider is OpenAI |
-| `OPENAI_MODEL` | `gpt-5.5` | OpenAI model id |
 
 ### Cost / generation controls
 
@@ -56,7 +56,7 @@ Open [http://localhost:3000](http://localhost:3000) — you will be redirected t
 | `OPENAI_MAX_OUTPUT_TOKENS` | `2000` | Caps completion length (main cost lever) |
 | `DAILY_CHAT_LIMIT` | `30` | Max `/api/chat` calls per IP per UTC day |
 
-If you currently only have an OpenAI key, set `AI_PROVIDER=openai`. If you use OpenRouter, set `AI_PROVIDER=openrouter` plus `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
+If you only set `OPENAI_API_KEY`, the app uses OpenAI automatically. If you only set `OPENROUTER_API_KEY`, it uses OpenRouter. To force one path, set `AI_PROVIDER=openai` or `AI_PROVIDER=openrouter`. After each chat reply, the prompt toolbar shows `provider · model` so you can confirm which key was billed.
 
 ## Vercel deploy
 
